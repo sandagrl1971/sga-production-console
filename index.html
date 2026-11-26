@@ -1,5 +1,5 @@
 <!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>SGA Production Console</title>
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
 <style>
 *{box-sizing:border-box}body{margin:0;background:#101722;color:#edf2f7;font:16px system-ui}main{max-width:850px;margin:auto;padding:16px}.panel{background:#1b2735;border:1px solid #39495c;border-radius:14px;padding:16px;margin:12px 0}h1{font-size:22px}h2{font-size:18px}label{display:block;margin:12px 0 5px}.muted{color:#a8b7c8;font-size:13px}input,select,textarea,button{width:100%;padding:12px;border:1px solid #526276;border-radius:9px;background:#0e1723;color:white;font:inherit;margin:4px 0}textarea{min-height:140px;font:13px monospace}button{background:#2563eb;border:0;font-weight:650}button.secondary{background:#475569}.topic{border:1px solid #46576c;border-radius:10px;padding:12px;margin:8px 0}.row{display:flex;gap:10px}.row>*{flex:1}.hidden{display:none!important}pre{white-space:pre-wrap;overflow-wrap:anywhere}@media(max-width:600px){main{padding:9px}.panel{padding:12px}.row{flex-direction:column}}
 </style></head><body><main><h1>SGA Universal Production Console</h1><p class="muted">Controller-driven · Stage Master authority · Mobile-ready</p>
@@ -17,13 +17,20 @@
 <script>
 const URL = "https://wemjcmjawvxqwkzrkryy.supabase.co", KEY = "sb_publishable_aM7WxvskpfCpAwWEHe3IRA_62Jx2kQC";
 const $=id=>document.getElementById(id);function say(v){const msg=typeof v==="string"?v:JSON.stringify(v,null,2);if($("log"))$("log").textContent=msg;if($("loginLog"))$("loginLog").textContent=msg}let boot=null,topic=null,post=null,selectionSessionId=null;const api=URL+"/functions/v1/sga-universal-production-controller";
-let sb=window.supabase?window.supabase.createClient(URL,KEY):null,clientPromise=null;
+let sb=null,clientPromise=null;
 async function ensureClient(){
  if(sb)return sb;
  if(clientPromise)return clientPromise;
- clientPromise=new Promise((resolve,reject)=>{const sc=document.createElement("script");sc.src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2";sc.onload=()=>window.supabase?resolve():reject(Error("Supabase library unavailable"));sc.onerror=()=>reject(Error("CDN load failed"));document.head.appendChild(sc)});
- try{await clientPromise;sb=window.supabase.createClient(URL,KEY);return sb}
- catch(first){clientPromise=new Promise((resolve,reject)=>{const sc=document.createElement("script");sc.src="https://unpkg.com/@supabase/supabase-js@2";sc.onload=()=>window.supabase?resolve():reject(Error("Supabase library unavailable"));sc.onerror=()=>reject(Error("Both Supabase library sources failed"));document.head.appendChild(sc)});await clientPromise;sb=window.supabase.createClient(URL,KEY);return sb}
+ clientPromise=(async()=>{
+  let mod;
+  try{mod=await import("https://esm.sh/@supabase/supabase-js@2");}
+  catch(first){try{mod=await import("https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm");}
+   catch(second){throw Error("SUPABASE_CLIENT_LOAD_FAILED: both browser module CDNs failed. "+(second?.message||first?.message||"Network or browser blocking"));}}
+  if(!mod?.createClient)throw Error("SUPABASE_CLIENT_LOAD_FAILED: createClient export missing");
+  sb=mod.createClient(URL,KEY,{auth:{persistSession:true,autoRefreshToken:true,detectSessionInUrl:true}});
+  return sb;
+ })();
+ try{return await clientPromise}catch(e){clientPromise=null;throw e}
 }
 async function call(action,body={}){const {data:{session}}=await sb.auth.getSession();if(!session)throw Error("Please sign in");const r=await fetch(api,{method:"POST",headers:{apikey:KEY,Authorization:"Bearer "+session.access_token,"Content-Type":"application/json"},body:JSON.stringify({action,...body})});const j=await r.json();if(!r.ok||j.ok===false)throw Error(j.error||"Controller request failed: "+r.status);return j}
 function esc(v){return String(v??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]))}
