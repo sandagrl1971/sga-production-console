@@ -15,8 +15,9 @@
 <div id="submit" class="hidden"><label>Stage output JSON (data_patch)</label><textarea id="patch"></textarea><label>Result metadata JSON</label><textarea id="result">{}</textarea><button id="send">Submit stage output</button></div></section>
 <section class="panel"><h2>System response</h2><pre id="log">Ready</pre></section></div></main>
 <script>
-const URL = "https://wemjcmjawvxqwkzrkryy.supabase.co", KEY = "sb_publishable_aM7WxvskpfCpAwWEHe3IRA_62Jx2kQC";
-const $=id=>document.getElementById(id);function say(v){const msg=typeof v==="string"?v:JSON.stringify(v,null,2);if($("log"))$("log").textContent=msg;if($("loginLog"))$("loginLog").textContent=msg}let boot=null,topic=null,post=null,selectionSessionId=null;const api=URL+"/functions/v1/sga-universal-production-controller";
+const SUPABASE_URL = "https://wemjcmjawvxqwkzrkryy.supabase.co";
+const SUPABASE_KEY = "sb_publishable_aM7WxvskpfCpAwWEHe3IRA_62Jx2kQC";
+const $=id=>document.getElementById(id);function say(v){const msg=typeof v==="string"?v:JSON.stringify(v,null,2);if($("log"))$("log").textContent=msg;if($("loginLog"))$("loginLog").textContent=msg}let boot=null,topic=null,post=null,selectionSessionId=null;const api=SUPABASE_URL+"/functions/v1/sga-universal-production-controller";
 let sb=null,clientPromise=null;
 async function ensureClient(){
  if(sb)return sb;
@@ -27,12 +28,13 @@ async function ensureClient(){
   catch(first){try{mod=await import("https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm");}
    catch(second){throw Error("SUPABASE_CLIENT_LOAD_FAILED: both browser module CDNs failed. "+(second?.message||first?.message||"Network or browser blocking"));}}
   if(!mod?.createClient)throw Error("SUPABASE_CLIENT_LOAD_FAILED: createClient export missing");
-  sb=mod.createClient(URL,KEY,{auth:{persistSession:true,autoRefreshToken:true,detectSessionInUrl:true}});
+  if(typeof SUPABASE_URL!=="string"||!/^https:\/\/[a-z0-9-]+\.supabase\.co$/.test(SUPABASE_URL))throw Error("SUPABASE_URL_CONFIG_INVALID: "+String(SUPABASE_URL));
+  sb=mod.createClient(SUPABASE_URL,SUPABASE_KEY,{auth:{persistSession:true,autoRefreshToken:true,detectSessionInUrl:true}});
   return sb;
  })();
  try{return await clientPromise}catch(e){clientPromise=null;throw e}
 }
-async function call(action,body={}){const {data:{session}}=await sb.auth.getSession();if(!session)throw Error("Please sign in");const r=await fetch(api,{method:"POST",headers:{apikey:KEY,Authorization:"Bearer "+session.access_token,"Content-Type":"application/json"},body:JSON.stringify({action,...body})});const j=await r.json();if(!r.ok||j.ok===false)throw Error(j.error||"Controller request failed: "+r.status);return j}
+async function call(action,body={}){const {data:{session}}=await sb.auth.getSession();if(!session)throw Error("Please sign in");const r=await fetch(api,{method:"POST",headers:{apikey:SUPABASE_KEY,Authorization:"Bearer "+session.access_token,"Content-Type":"application/json"},body:JSON.stringify({action,...body})});const j=await r.json();if(!r.ok||j.ok===false)throw Error(j.error||"Controller request failed: "+r.status);return j}
 function esc(v){return String(v??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]))}
 async function bootConsole(){await ensureClient();const {data:{session}}=await sb.auth.getSession();if(!session)return;$("login").classList.add("hidden");$("app").classList.remove("hidden");$("user").textContent=session.user.email||session.user.id;boot=await call("bootstrap");$("channel").innerHTML=(boot.channels||[]).map(c=>'<option value="'+esc(c.channel_key)+'">'+esc(c.display_name||c.channel_key)+'</option>').join("");$("stages").innerHTML=(boot.stages||[]).map(s=>'<div class="topic"><b>'+esc(s.stage_order+" · "+s.stage_name)+'</b><div class="muted">'+esc(s.stage_key+" · "+s.stage_type+" · next "+(s.next_stage_key||"terminal"))+'</div></div>').join("");await loadTopics()}
 async function loadTopics(){topic=null;$("create").disabled=true;$("chosen").textContent="No topic selected";const r=await call("topics",{channel_key:$("channel").value,search:$("search").value,limit:100});$("topics").innerHTML=(r.topics||[]).map((t,i)=>'<div class="topic"><b>'+esc(t.topic_name)+'</b><div class="muted">'+esc(t.topic_key)+'</div><button class="secondary" data-index="'+i+'">Select topic</button></div>').join("")||"No enabled topics";$("topics").querySelectorAll("button").forEach((b,i)=>b.onclick=()=>{topic=r.topics[i];$("chosen").textContent="Selected: "+topic.topic_name;$("create").disabled=false})}
